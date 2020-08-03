@@ -1,0 +1,70 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: tenants-service
+  namespace: prod
+spec:
+  selector:
+    app: tenants-service
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: tenants-service
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tenants-service
+  namespace: prod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tenants-service
+  template:
+    metadata:
+      labels:
+        app: tenants-service
+    spec:
+      imagePullSecrets:
+        - name: pipeline-docker-registry
+      nodeName: prod-node-1
+      containers:
+        - name: tenants-service
+          image: ${CICD_IMAGE}:${CICD_EXECUTION_SEQUENCE}
+          env:
+            - name: APP_ENVIRONMENT
+              value: 'prod'
+            - name: KAFKA_PREFIX
+              value: prod
+            - name: KAFKA_HOST
+              value: kafka.kafka
+            - name: KAFKA_PORT
+              value: '9094'
+          envFrom:
+            - secretRef:
+                name: tenants-prod-db-credentials
+                optional: false
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: tenants-ingress
+  namespace: prod
+spec:
+  rules:
+    - host: 116.203.92.21.xip.io
+      http:
+        paths:
+          - backend:
+              serviceName: tenants-service
+              servicePort: 8080
+            path: /api/tenant
+  tls:
+    - hosts:
+        - tenants.116.203.92.21.xip.io
+---
+
+
